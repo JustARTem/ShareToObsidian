@@ -27,6 +27,7 @@ import org.jsoup.nodes.Document
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.io.IOException
+import java.net.URL
 
 class ShareReceiverActivity : AppCompatActivity() {
 
@@ -177,6 +178,15 @@ class ShareReceiverActivity : AppCompatActivity() {
 
                 val vaultRootUri = Uri.parse(vaultRootUriStr)
                 var parentDir = DocumentFile.fromTreeUri(this, vaultRootUri)
+//                val vaultName = vaultRootUri.lastPathSegment // Название хранилища
+                val vaultName = parentDir?.name // Название хранилища
+                if (vaultName.isNullOrEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this, "Vault некорректно настроен (пустое название). проверьте настройки.", Toast.LENGTH_LONG).show()
+                    }
+                    runOnUiThread { finish() }
+                    return@Thread
+                }
 
                 // Переходим в подпапку (например, /Clips)
                 if (relativeSubfolder.isNotEmpty()) {
@@ -205,15 +215,21 @@ class ShareReceiverActivity : AppCompatActivity() {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 val timestamp = now.format(formatter)
 
+                var tags = "ссылка" //TODO: сделать установку названия тега в настройках
+                val shortHost = getShortHost(url)
+                if (shortHost.isNotEmpty()) {
+                    tags += "/"+shortHost.replace(".", "∙") // в Obsidian теги не могут содержать точки, поэтому заменяем на U+2219 (BULLET OPERATOR	маленькая точка по центру)
+                }
+                val titleFixed = title.replace(":", "∶") // U+2236 - наиболее похожий
+
                 val markdown = """
                     ---
+                    title: $titleFixed
                     created: $timestamp
                     source: $url
-                    tags: ссылка
+                    tags: $tags
                     ---
                     
-                    # $title
-
                     $description
 
                 """.trimIndent()
@@ -225,7 +241,7 @@ class ShareReceiverActivity : AppCompatActivity() {
 
                 // Открываем в Obsidian
                 runOnUiThread {
-                    showSaveSuccess(documentFile, relativeSubfolder, finalFileName)
+                    showSaveSuccess(documentFile, relativeSubfolder, finalFileName,vaultName)
                 }
 
             } catch (e: Exception) {
@@ -238,20 +254,27 @@ class ShareReceiverActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun showSaveSuccess(file: DocumentFile, subfolder: String, finalFileName: String) {
+    private fun showSaveSuccess(file: DocumentFile, subfolder: String, finalFileName: String,vaultName: String) {
         val fileNameWithoutExt = finalFileName.replace(".md", "")
         val folderPart = if (subfolder.isEmpty()) "" else "$subfolder/"
         val relativePath = "${folderPart}${fileNameWithoutExt}".trim('/')
 
         val encodedPath = Uri.encode(relativePath)
+//        val encodedAbsPath = file.uri.encodedPath
+        val vault = sharedPreferences.getString("obsidian_vault_path", null)
+
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse("obsidian://open?file=$encodedPath")
+//            data = Uri.parse("obsidian://open?file=$encodedPath") //открыть по пути относительно хранилища (работает криво, если несколько хранилищ)
+//            data = Uri.parse("obsidian://open?path=$encodedAbsPath") //открыть по абсолютному пути - не работает
+            data = Uri.parse("obsidian://open?vault=$vaultName&file=$encodedPath") //открыть по пути относительно хранилища с указанием имени хранилища. Работает нормально
+
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         val rootView = findViewById<View>(android.R.id.content)
 
-        Snackbar.make(rootView, "Сохранено: $finalFileName", Snackbar.LENGTH_INDEFINITE)
+//        Snackbar.make(rootView, "Сохранено: $finalFileName\n encodedAbsPath: $encodedAbsPath", Snackbar.LENGTH_INDEFINITE)
+        Snackbar.make(rootView, "Сохранено: $finalFileName \nв хранилище \"$vaultName\"", Snackbar.LENGTH_INDEFINITE)
             .setAction("Открыть") {
                 if (intent.resolveActivity(packageManager) != null) {
                     try {
@@ -266,32 +289,36 @@ class ShareReceiverActivity : AppCompatActivity() {
                 }
                 finish()
             }
+            .setActionTextColor(ContextCompat.getColor(this, R.color.snackbar_text))
             .show()
+    }
+
+    private fun getShortHost(url: String): String {
+        return try {
+            val uri = URL(url)
+            val host = uri.host
+            val cleanHost = host.removePrefix("www.").removePrefix("m.").removePrefix("mobile.")
+            val parts = cleanHost.split('.')
+            var shortHost = cleanHost;
+            if (parts.size >= 2) {
+                shortHost = parts.takeLast(2).joinToString(".")
+            }
+
+            // Ограничиваем длину домена (например, до 20 символов)
+            if (shortHost.length > 20) {
+                shortHost = shortHost.substring(0, 20)
+            }
+            shortHost
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     private fun generateFileName(title: String, url: String): String {
         // Очищаем заголовок
         var cleanTitle = sanitizeFileName(title).trim()
 
-        // Получаем host из URL
-        val host = try {
-            val uri = Uri.parse(url)
-            uri.host?.removePrefix("www.") ?: "unknown"
-        } catch (e: Exception) {
-            "unknown"
-        }
-
-        var shortHost = when {
-            host.contains("t.me") -> "t.me"
-            host.contains("x.com") -> "x.com"
-            host.contains("youtube.com") -> "youtube"
-            host.contains("kinopoisk.ru") -> "kinopoisk"
-            else -> host.split(".").firstOrNull() ?: "unknown"  // только имя сайта
-        }
-        // Ограничиваем длину домена (например, до 20 символов)
-        if (shortHost.length > 20) {
-            shortHost = shortHost.substring(0, 20)
-        }
+        var shortHost = getShortHost(url)
 
         // Формируем имя: "Заголовок (host)"
         val fileName = if (cleanTitle.endsWith(".md")) {
@@ -300,7 +327,7 @@ class ShareReceiverActivity : AppCompatActivity() {
             cleanTitle
         }
 
-        val withHost = "$fileName ($shortHost)"
+        val withHost = fileName + (if (shortHost.isNotEmpty()) " ($shortHost)" else "")
 
         // Ещё раз очищаем, на случай, если host добавил недопустимые символы
         return sanitizeFileName(withHost) + ".md"
@@ -308,21 +335,34 @@ class ShareReceiverActivity : AppCompatActivity() {
 
     private fun sanitizeFileName(name: String): String {
         // Удаляем или заменяем только недопустимые символы для имён файлов в Android/Windows/FAT/NTFS
+
+        var cleaned = name
+            .replace(":", "∶")
+            .replace("\"", "'")
+            .replace("*", "∙")
+            .replace("?", "？")
+//            .replace(".", "⋅")
+
         val illegalChars = Regex("[<>:\"/\\\\|?*\\x00-\\x1F]") // включая управляющие символы
-        var cleaned = name.replace(illegalChars, "_")
+        cleaned = cleaned.replace(illegalChars, "_")
 
         // Заменяем множественные пробелы и подчёркивания на одно подчёркивание
         cleaned = cleaned.replace(Regex("[ \\t]+"), " ")   // множественные пробелы → один пробел
         cleaned = cleaned.replace(Regex("_+"), "_")        // множественные `_` → одно
 
-        // Убираем пробелы и подчёркивания в начале и конце
-        cleaned = cleaned.trim(' ', '_')
+        cleaned = cleaned.trim(' ', '_') // Убираем пробелы и подчёркивания в начале и конце
+        cleaned = cleaned.trimStart('.') // Убираем точки в начале
 
         // Заменяем пустое имя
-        if (cleaned.isEmpty()) return "untitled"
+        if (cleaned.isEmpty()) {
+            val now = LocalDateTime.now()
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            val timestamp = now.format(formatter)
+            return timestamp
+        }
 
         // Ограничиваем длину (Android обычно до 255 байт, но лучше 100 символов для надёжности)
-        return if (cleaned.length > 100) cleaned.substring(0, 100) else cleaned
+        return if (cleaned.length > 150) cleaned.substring(0, 150) else cleaned
     }
 
     private fun showError(message: String) {

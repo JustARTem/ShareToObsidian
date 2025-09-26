@@ -1,10 +1,12 @@
 package ru.justartem.tools.sharetoobsidian
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -12,7 +14,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.textfield.TextInputEditText
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
+import com.google.android.material.snackbar.Snackbar
 import java.io.IOException
+import java.net.URLDecoder
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -59,7 +63,7 @@ class SettingsActivity : AppCompatActivity() {
         val relativeFolder = sharedPreferences.getString("save_folder_relative", "")
 
         if (vaultRoot != null) {
-            tvVaultRootPath.text = vaultRoot
+            tvVaultRootPath.text = URLDecoder.decode(vaultRoot, "UTF-8")
         }
 
         editRelativeFolder.setText(relativeFolder)
@@ -90,8 +94,10 @@ class SettingsActivity : AppCompatActivity() {
 
         tvStatus.text = "Настройки сохранены"
         tvStatus.visibility = android.view.View.VISIBLE
+        val rootView = findViewById<View>(android.R.id.content)
+        Snackbar.make(rootView, "Настройки сохранены.\nТеперь можно делиться ссылками!", Snackbar.LENGTH_SHORT).show()
 
-        Toast.makeText(this, "Готово! Теперь можно делиться ссылками", Toast.LENGTH_SHORT).show()
+        //Toast.makeText(this, "Готово! Теперь можно делиться ссылками", Toast.LENGTH_SHORT).show()
 
         // Можно закрыть через пару секунд
         android.os.Handler(mainLooper).postDelayed({

@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ShareToObsidian" parent="android:Theme.Material.Light.NoActionBar"/>
+    <style name="ShareToObsidian" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/primary_color</item>
+        <item name="colorPrimaryDark">@color/primary_dark_color</item>
+        <!-- Цвет текста и иконок в ActionBar -->
+        <item name="colorOnPrimary">@color/white</item>
+
+        <item name="snackbarStyle">@style/MySnackbarStyle</item>
+        <item name="snackbarTextViewStyle">@style/MySnackbarTextStyle</item>
+    </style>
+    <style name="MySnackbarStyle" parent="Widget.Material3.Snackbar">
+        <item name="android:background">@color/snackbar_background</item>
+        <item name="backgroundTint">@color/snackbar_background</item>
+        <item name="android:minHeight">80dp</item>
+        <item name="android:paddingVertical">16dp</item>
+        <item name="elevation">8dp</item>
+    </style>
+    <style name="MySnackbarTextStyle" parent="Widget.Material3.Snackbar.TextView">
+        <item name="android:textColor">@color/snackbar_text</item>
+        <item name="android:maxLines">3</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
 </resources>
