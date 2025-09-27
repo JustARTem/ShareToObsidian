@@ -1,3 +1,7 @@
+import com.android.build.gradle.internal.api.ApkVariantOutputImpl
+import java.text.SimpleDateFormat
+import java.util.*
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,12 +11,16 @@ android {
     namespace = "ru.justartem.tools.sharetoobsidian"
     compileSdk = 35
 
+    // Получаем данные из Git
+    val versionCodeFromGit = getCommitCount()
+    val versionNameFromGit = "1.0.${getCommitCount()}" // или использовать гит-хэш
+
     defaultConfig {
         applicationId = "ru.justartem.tools.sharetoobsidian"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = versionCodeFromGit
+        versionName = versionNameFromGit
 
 //        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,6 +41,8 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+
 }
 
 dependencies {
@@ -50,4 +60,22 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.5.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 
+}
+
+// Функция: количество коммитов в ветке
+fun getCommitCount(): Int {
+    val command = "git rev-list --count HEAD"
+    return try {
+        command.execute().trim().toInt()
+    } catch (e: Exception) {
+        1 // fallback
+    }
+}
+
+// Вспомогательный метод для выполнения команды
+fun String.execute(): String {
+    val parts = this.split("\\s".toRegex())
+    val process = Runtime.getRuntime().exec(parts.toTypedArray())
+    process.waitFor()
+    return process.inputStream.bufferedReader().readText()
 }
