@@ -82,7 +82,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun loadSettings() {
         val vaultRoot = sharedPreferences.getString("obsidian_vault_path", null)
         val relativeFolder = sharedPreferences.getString("save_folder_relative", "Ссылки")
-        val tags = sharedPreferences.getString("save_tags", "ссылки")
+        val tags = sharedPreferences.getString("save_tags", "ссылка")
 //        val attachmentsFolder = sharedPreferences.getString("save_attachments_folder", "__вложения")
 
         if (vaultRoot != null) {
