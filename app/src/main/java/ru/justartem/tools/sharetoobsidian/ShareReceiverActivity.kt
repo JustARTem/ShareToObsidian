@@ -124,8 +124,9 @@ class ShareReceiverActivity : AppCompatActivity() {
                 if (title.isNotEmpty()) {
                     val description = extractDescription(doc)
                     val image = extractImage(doc)
+                    val keywords = extractKeywords(doc)
                     Log.d(TAG, "Контент получен:\n$title\n$description\n$image")
-                    runOnUiThread { saveToFile(title, description, image, url) }
+                    runOnUiThread { saveToFile(title, description, image, keywords, url) }
                 } else {
                     Log.w(TAG, "Контент пустой, запускаем WebView")
                     runOnUiThread {
@@ -220,7 +221,8 @@ class ShareReceiverActivity : AppCompatActivity() {
                                              document.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
                                              document.querySelector('link[rel="image_src"]')?.getAttribute('href') ||
                                              '';
-                            return JSON.stringify({ title: title || 'Без названия', description: metaDesc || preview, image: imageUrl });
+                             const keywordsText = document.querySelector('meta[name="keywords"]')?.getAttribute('content') || '';
+                            return JSON.stringify({ title: title || 'Без названия', description: metaDesc || preview, image: imageUrl, keywords: keywordsText });
                         })();
                     """
                     ) { result ->
@@ -233,12 +235,13 @@ class ShareReceiverActivity : AppCompatActivity() {
                             val title = json.getString("title")
                             val description = json.getString("description")
                             val image = json.getString("image")
+                            val keywords = json.getString("keywords")
                             runOnUiThread {
-                                saveToFile(title, description, image, url)
+                                saveToFile(title, description, image, keywords,url)
                             }
                         } catch (e: Exception) {
                             runOnUiThread {
-                                saveToFile("Без названия", "Не удалось извлечь контент", "", url)
+                                saveToFile("Без названия", "Не удалось извлечь контент", "", "",url)
                             }
                         }
                         cleanupWebView()
@@ -246,7 +249,7 @@ class ShareReceiverActivity : AppCompatActivity() {
                 }
 
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                    saveToFile("Ошибка загрузки", "Не удалось загрузить страницу", "", url)
+                    saveToFile("Ошибка загрузки", "Не удалось загрузить страницу", "", "",url)
                     cleanupWebView()
                 }
             }
@@ -324,7 +327,7 @@ class ShareReceiverActivity : AppCompatActivity() {
     /**
      * Сохраняет файл-markdown-заметку в Obsidian
      */
-    private fun saveToFile(title: String, description: String, image: String, url: String) {
+    private fun saveToFile(title: String, description: String, image: String, keywords: String, url: String) {
         Log.d(TAG, "saveToFile()...\ntitle:$title\ndescription:$description\nimage:$image\nurl: $url")
         runOnUiThread { statusText.text = "Контент получен. Сохраняем..." }
         Thread {
@@ -383,10 +386,11 @@ class ShareReceiverActivity : AppCompatActivity() {
                 // Генерация имени
                 val fileName = generateFileName(title, url)
 
+                var imageMarkdown = ""
+
                 // Для сохранения картинки как вложения
                 // Если в настройках включено сохранение картинки и есть картинка, сохраняем ее
-                var imageFileName: String? = null
-                var imageMarkdown = ""
+//                var imageFileName: String? = null
 
 //                Log.d(TAG, "saveAttachments: " + (if (saveAttachments) "Включено" else "Выключено"))
 //                Log.d(TAG, "image: " + (if (image.isNotEmpty()) image else "--"))
@@ -487,6 +491,9 @@ title: $titleFixed
 created: $timestamp
 source: $url
 tags: $tags
+domain: $shortHost
+keywords: $keywords
+image: $image
 ---
 
 $description
